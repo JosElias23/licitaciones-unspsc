@@ -19,7 +19,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "ruff>=0.5"]
-llm = ["dspy>=3.0"]   # only needed for scripts/run_llm_variants.py
+llm = ["dspy>=3.0"]                  # scripts/run_llm_variants.py
+encoder = [                          # scripts/run_encoder.py
+    "torch>=2.0",
+    "transformers>=4.44,<5",
+    "huggingface-hub>=0.34,<1.0",    # transformers<5 rejects hub>=1.0
+    "accelerate>=0.33",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

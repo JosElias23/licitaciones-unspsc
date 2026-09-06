@@ -44,6 +44,17 @@ baselines:
     learning_rate: 0.1
     max_depth: 6
 
+# Fine-tuned Spanish encoder. Titles are eight words long, so max_length is small
+# and batches can be large; this trains in a couple of minutes on one consumer GPU.
+encoder:
+  model_name: dccuchile/bert-base-spanish-wwm-cased    # BETO
+  max_length: 64
+  num_epochs: 15          # 6 is undertrained (loss 1.87), 30 overfits; see docs/DECISIONS.md
+  batch_size: 32
+  learning_rate: 3.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+
 llm:
   # Local model, so the repository costs nothing to reproduce and no key leaves
   # the machine.

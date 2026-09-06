@@ -323,13 +323,107 @@ Neither is close to the 0.36 ms of the linear model.
 
 ---
 
-## 6. What was not done
+## 6. The favourite loses too
+
+Every version of this write-up named a fine-tuned Spanish encoder as the honest
+favourite and left it in the limitations section. That is a comfortable place to
+keep a prediction, because an untested favourite can never be wrong.
+
+BETO (`dccuchile/bert-base-spanish-wwm-cased`, 110 M parameters) fine-tuned on
+the same 2,874 training tenders, scored on the same 952 held-out ones:
+
+| Model | Accuracy | 95% CI | Macro-F1 | ms per tender |
+|---|---:|:--|---:|---:|
+| TF-IDF + linear SVM | 0.5578 | [0.5263, 0.5893] | 0.5077 | 0.31 |
+| BETO fine-tuned | 0.5378 | [0.5063, 0.5704] | 0.4886 | 0.50 |
+
+Paired bootstrap: **−0.0200 accuracy [−0.0494, +0.0095], p = 0.186**, and
+−0.0191 macro-F1 [−0.0536, +0.0145], p = 0.270. Both intervals cover zero.
+
+**The prediction was wrong.** A fine-tuned transformer does not beat a linear
+model on TF-IDF features here. It draws level, after 80 seconds of GPU training
+against 2.5 seconds of CPU fitting.
+
+### 6.1 The first answer was wrong in the other direction
+
+Run at the configured 6 epochs, BETO scored 0.4989 accuracy and 0.3544 macro-F1,
+losing significantly on both. Training loss was still 1.865, which is the tell.
+
+| Epochs | Train loss | Accuracy | Macro-F1 | vs TF-IDF (accuracy) |
+|---:|---:|---:|---:|:--|
+| 6 | 1.865 | 0.4989 | 0.3544 | −0.0588, **significant** |
+| **15** | **0.935** | **0.5378** | **0.4886** | −0.0200, **not significant** |
+| 30 | 0.512 | 0.5221 | 0.4646 | −0.0357, **significant** |
+
+An inverted U, and both ends are traps. At 6 epochs the model has not converged;
+at 30 it has memorised 2,874 examples and generalises worse. Reporting either
+end would have produced a confident, wrong headline, in opposite directions.
+
+This is the same mistake as section 5.3 in a different costume. There I nearly
+published "DSPy underperforms" when the harness was at fault; here I nearly
+published "transformers lose to TF-IDF" when the training schedule was. The
+habit worth keeping is to check whether the losing method was given a fair
+chance before writing down that it lost.
+
+### 6.2 Why the transformer does not win
+
+Three plausible reasons, in the order I would bet on them:
+
+**Roughly 90 examples per class.** 2,874 tenders across 32 categories. A 110 M
+parameter model fine-tuned on that is working near the bottom of its data range,
+while a linear model over sparse features is comfortable there.
+
+**The text is not the Spanish BETO was trained on.** Procurement titles are
+capitalised, abbreviated fragments: `ADQ. SERV. REPARACION VEH-. FISCAL BT-278`.
+WordPiece splits `ADQ.` and `VEH-.` into rubble, whereas the character n-grams in
+the TF-IDF model match across exactly those mutilations. Section 2.6 chose them
+for that reason, and this is the evidence that the choice mattered.
+
+**The macro-F1 gap is wider than the accuracy gap** at every epoch count, which
+points at the tail. With 90 examples per class on average, the rare classes have
+a few dozen, and that is where the transformer gives most of its ground away.
+
+### 6.3 The result worth deploying: knowing when to abstain
+
+A classifier forced to answer everything is judged on one number. Allowed to
+abstain, it trades coverage for accuracy, and for a procurement desk that trade
+is the actual product: auto-file what the model is sure about, route the rest to
+a person.
+
+Softmax confidence from the fine-tuned encoder, on the held-out month:
+
+| Confidence >= | Coverage | Tenders kept | Accuracy on kept |
+|---:|---:|---:|---:|
+| 0.00 | 100.0% | 952 | 0.5378 |
+| 0.50 | 85.8% | 817 | 0.5900 |
+| 0.70 | 72.2% | 687 | 0.6390 |
+| 0.80 | 63.5% | 605 | 0.6678 |
+| 0.90 | 50.6% | 482 | 0.7054 |
+| 0.95 | 39.7% | 378 | 0.7275 |
+
+Accuracy climbs monotonically with the threshold, so the confidence score does
+carry usable signal. But note what it costs: reaching 72.8% accuracy means
+answering only 39.7% of tenders, and even then almost three in ten of those are
+wrong. **This is not deployable as an auto-filing system.** It is a suggestion
+tool that would save a categoriser some typing, and the honest framing is that,
+not automation.
+
+The softmax probabilities are also uncalibrated, so these thresholds are
+rankings rather than error-rate guarantees. Temperature scaling or conformal
+prediction would turn "confidence >= 0.9" into a statement with a coverage
+guarantee attached, and neither is implemented.
+
+---
+
+## 7. What was not done
 
 - **No GEPA.** DSPy 3.3 ships `dspy.GEPA`, reported to reach a given quality in
   35x fewer rollouts than earlier optimisers. Only `BootstrapFewShot` was run
   here, so nothing is claimed about what a stronger optimiser would do.
-- **No fine-tuned encoder.** A Spanish BERT fine-tuned on 2,874 examples would
-  very likely beat both, and is the honest favourite for this task.
+- **No calibration.** The encoder's softmax scores rank well but are not
+  calibrated, so the coverage table in section 6.3 gives operating points, not
+  guaranteed error rates. Temperature scaling or conformal prediction would fix
+  that and is the most useful thing left undone.
 - **No hierarchical evaluation.** UNSPSC nests segment → family → class →
   commodity. Only the 2-digit segment is predicted. Predicting the 4-digit family
   is harder and more useful, and scoring partial credit down the hierarchy would
@@ -343,7 +437,7 @@ Neither is close to the 0.36 ms of the linear model.
 
 ---
 
-## 7. Reproducing
+## 8. Reproducing
 
 ```bash
 pip install -e ".[dev]"

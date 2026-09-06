@@ -111,6 +111,48 @@ one row per tender brought the majority class down to 10.1%.
 Full reasoning, including a reproducibility bug that seeding did not catch, is in
 [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
+### And the favourite lost too
+
+Every version of this README named a fine-tuned Spanish encoder as the likely
+winner and left it untested. BETO (110 M parameters), fine-tuned on the same
+2,874 tenders:
+
+| Model | Accuracy | 95% CI | Macro-F1 | ms per tender |
+|---|---:|:--|---:|---:|
+| TF-IDF + linear SVM | 0.5578 | [0.5263, 0.5893] | 0.5077 | 0.31 |
+| BETO fine-tuned | 0.5378 | [0.5063, 0.5704] | 0.4886 | 0.50 |
+
+−0.0200 accuracy, [−0.0494, +0.0095], p = 0.186. **The prediction was wrong**:
+the transformer draws level, it does not win, after 80 seconds of GPU training
+against 2.5 seconds of CPU fitting.
+
+The first answer was wrong in the other direction. At the configured 6 epochs
+BETO scored 0.4989 and lost significantly, with training loss still at 1.865. At
+30 epochs it overfits back down to 0.5221. Only the middle of that inverted U is
+the real answer, and either end would have made a confident, wrong headline.
+
+Three reasons it does not win, in the order I would bet on them: about 90
+examples per class, procurement titles that WordPiece shreds (`ADQ. SERV.
+REPARACION VEH-.`) where character n-grams do not, and a macro-F1 gap wider than
+the accuracy gap at every epoch count, which points at the rare classes.
+
+### What would actually ship
+
+Forced to answer everything, the encoder gets 53.8% right. Allowed to abstain:
+
+| Confidence ≥ | Coverage | Accuracy on what it keeps |
+|---:|---:|---:|
+| 0.50 | 85.8% | 0.5900 |
+| 0.70 | 72.2% | 0.6390 |
+| 0.90 | 50.6% | 0.7054 |
+| 0.95 | 39.7% | 0.7275 |
+
+Accuracy rises monotonically with the threshold, so the confidence carries real
+signal. It is still not enough: 72.8% accuracy on 39.7% of tenders means almost
+three in ten of the kept ones are wrong. **This is a suggestion tool, not an
+auto-filing system**, and saying otherwise would be the easiest overclaim in the
+whole project.
+
 ---
 
 ## Data
@@ -160,8 +202,10 @@ all produced by the scripts above.
 35x fewer rollouts. Only `BootstrapFewShot` was run, so nothing is claimed about
 stronger optimisers.
 
-**No fine-tuned encoder.** A Spanish BERT fine-tuned on 2,874 examples is the
-honest favourite for this task and is not implemented.
+**No calibration.** The encoder's softmax scores rank well but are not
+calibrated, so the coverage table gives operating points rather than guaranteed
+error rates. Temperature scaling or conformal prediction is the most useful
+thing left undone.
 
 **Segment only.** UNSPSC nests segment → family → class → commodity. Only the
 two-digit segment is predicted; the four-digit family is harder and more useful.
