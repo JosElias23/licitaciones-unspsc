@@ -26,6 +26,11 @@ encoder = [                          # scripts/run_encoder.py
     "huggingface-hub>=0.34,<1.0",    # transformers<5 rejects hub>=1.0
     "accelerate>=0.33",
 ]
+serving = [                          # scripts/run_quantisation.py
+    "onnx>=1.16",
+    "onnxruntime>=1.18",
+    "onnxscript>=0.1",               # torch>=2.9 needs it even for dynamo=False imports
+]
 
 [build-system]
 requires = ["setuptools>=68"]

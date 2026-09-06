@@ -153,6 +153,42 @@ three in ten of the kept ones are wrong. **This is a suggestion tool, not an
 auto-filing system**, and saying otherwise would be the easiest overclaim in the
 whole project.
 
+### Quantised for CPU: the accuracy line hides most of the change
+
+The encoder is the model a procurement desk would run, and it would run without
+a GPU. Three arms, identical test items in identical order, one CPU thread,
+batch size one:
+
+| Arm | Accuracy | Size | p50 | **Flip rate** | Mean KL |
+|---|---:|---:|---:|---:|---:|
+| PyTorch FP32 | 0.5399 | 440 MB | 116.7 ms | — | — |
+| ONNX FP32 | 0.5399 | 440 MB | 90.7 ms | **0.00%** | 0.00000 |
+| ONNX INT8 | 0.5347 | **111 MB** | **29.2 ms** | **8.19%** | 0.06567 |
+
+Exporting to ONNX changes nothing at all: zero flips, KL exactly zero, 1.29×
+faster. INT8 is 4× smaller, 4× faster, and its accuracy drop of 0.0053 has a
+bootstrap interval of [−0.0179, +0.0074] that covers zero. Reported the usual
+way, that reads as free.
+
+It is not free. **78 of 952 predictions changed, 8.19%, against a net accuracy
+move of −0.53% — 15.6 times more churn than the published number implies.**
+
+| Direction | Count |
+|---|---:|
+| Wrong → right | 17 |
+| Right → wrong | 22 |
+| Wrong → a *different* wrong answer | **39** |
+
+Half the flips are in that last row and no aggregate metric can see them:
+accuracy nets the first two against each other and is blind to the third. The
+framing follows Microsoft Research's [*Accuracy Is Not All You
+Need*](https://arxiv.org/abs/2407.09141), which argues flips and KL divergence
+are the right way to compare a compressed model to its baseline.
+
+INT8 is still what to ship here. It just is not the same model: it agrees with
+the original 92% of the time and is equally good on average, and only the second
+half of that sentence usually gets written down.
+
 ---
 
 ## Data

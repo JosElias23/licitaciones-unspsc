@@ -415,7 +415,91 @@ guarantee attached, and neither is implemented.
 
 ---
 
-## 7. What was not done
+## 7. Quantising for CPU: what the accuracy line does not show
+
+The encoder is the model a procurement desk would actually run, and it would run
+on a CPU. The standard way to report that step is one line: "INT8, accuracy
+within half a point, four times faster". This section is about what that line
+hides.
+
+Microsoft Research's *Accuracy Is Not All You Need* (arXiv 2407.09141) argues
+that aggregate accuracy is the wrong metric for compression, because a
+compressed model can match its baseline on average while disagreeing with it on
+a large minority of individual inputs, roughly half the disagreements in each
+direction. Their proposal is to report **flips**, the share of predictions that
+change, and the KL divergence between the two output distributions.
+
+Three arms, identical test items in identical order, single CPU thread, batch
+size one, measured after warm-up over three repeats:
+
+| Arm | Accuracy | Macro-F1 | Size | p50 | p95 | Flip rate | Mean KL |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| PyTorch FP32 | 0.5399 | 0.4890 | 440 MB | 116.7 ms | 125.9 ms | — | — |
+| ONNX FP32 | 0.5399 | 0.4890 | 440 MB | 90.7 ms | 96.4 ms | **0.00%** | 0.00000 |
+| ONNX INT8 | 0.5347 | 0.4838 | **111 MB** | **29.2 ms** | **31.0 ms** | **8.19%** | 0.06567 |
+
+### 7.1 The export is free; the quantisation is not
+
+The middle arm exists to separate two changes that get blamed on one. Exporting
+to ONNX changed **nothing**: zero flips, KL of exactly zero, identical accuracy
+to four decimals, and 1.29x faster. That is the same model, computed by a better
+runtime.
+
+INT8 is where behaviour changes. Four times smaller, four times faster than
+PyTorch, and an accuracy drop of 0.0053 with a bootstrap interval of
+[−0.0179, +0.0074] that covers zero. Reported conventionally, that reads as
+"free".
+
+### 7.2 It is not free: one prediction in twelve changed
+
+**78 of 952 predictions flipped, 8.19%, against a net accuracy change of
+−0.53%.** The churn is **15.6 times** the size of the number normally published.
+
+Where the flips went:
+
+| Direction | Count |
+|---|---:|
+| Wrong → right | 17 |
+| Right → wrong | 22 |
+| Wrong → a *different* wrong answer | **39** |
+
+Half of all the flips are in that third row, and no aggregate metric can see
+them. Accuracy nets the first two rows against each other and is blind to the
+third. Macro-F1 barely moves. A user who reported a bad category last week and
+sees a different bad category this week has experienced a change the monitoring
+dashboard says did not happen.
+
+For this system that is survivable, because it is a suggestion tool and its
+suggestions were already wrong 46% of the time. For a system whose output is
+cached, audited, or explained to a customer, an 8% silent change rate on a
+deployment described as behaviour-preserving is a different matter.
+
+### 7.3 What to actually ship
+
+ONNX INT8: 111 MB instead of 440, 29.2 ms instead of 116.7 on one CPU thread,
+and no statistically detectable accuracy cost. It fits in a small container with
+no GPU, which is the whole point.
+
+The honest deployment note is that INT8 is **not** the same model. It is a model
+that agrees with the original 92% of the time and is equally good on average.
+Those are both true and only the second one usually gets written down.
+
+### 7.4 Two things that went wrong on the way
+
+**The exporter.** torch 2.11 defaults to the dynamo ONNX exporter, which ignores
+`dynamic_axes` in favour of `dynamic_shapes` and emits a graph that
+onnxruntime's quantizer refuses with `Inferred shape and existing shape differ
+in dimension 0: (768) vs (32)`. Passing `dynamo=False` selects the TorchScript
+exporter, whose graph quantises cleanly.
+
+**The console.** The exporter logs a tick emoji on success, and the default
+Windows console encoding cannot represent it, so a successful export raised
+`UnicodeEncodeError`. Both fixes are one line each and both cost more time to
+diagnose than to write, which is the usual ratio for this kind of thing.
+
+---
+
+## 8. What was not done
 
 - **No GEPA.** DSPy 3.3 ships `dspy.GEPA`, reported to reach a given quality in
   35x fewer rollouts than earlier optimisers. Only `BootstrapFewShot` was run
@@ -437,7 +521,7 @@ guarantee attached, and neither is implemented.
 
 ---
 
-## 8. Reproducing
+## 9. Reproducing
 
 ```bash
 pip install -e ".[dev]"

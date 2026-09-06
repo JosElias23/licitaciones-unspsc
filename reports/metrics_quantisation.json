@@ -1,0 +1,62 @@
+{
+  "accuracy_vs_baseline": {
+    "onnx_fp32": {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "difference": 0.0,
+      "metric": "accuracy",
+      "n_resamples": 5000,
+      "p_value": 1.0,
+      "significant": false
+    },
+    "onnx_int8": {
+      "ci_lower": -0.0179,
+      "ci_upper": 0.0074,
+      "difference": -0.0053,
+      "metric": "accuracy",
+      "n_resamples": 5000,
+      "p_value": 0.4716,
+      "significant": false
+    }
+  },
+  "arms": [
+    {
+      "accuracy": 0.5399,
+      "arm": "torch_fp32",
+      "macro_f1": 0.489,
+      "p50_ms": 116.66,
+      "p95_ms": 125.86,
+      "size_mb": 439.5
+    },
+    {
+      "accuracy": 0.5399,
+      "arm": "onnx_fp32",
+      "flip_rate": 0.0,
+      "flips_right_to_wrong": 0,
+      "flips_wrong_to_right": 0,
+      "flips_wrong_to_wrong": 0,
+      "macro_f1": 0.489,
+      "mean_kl_divergence": 0.0,
+      "p50_ms": 90.7,
+      "p95_ms": 96.39,
+      "size_mb": 439.7
+    },
+    {
+      "accuracy": 0.5347,
+      "arm": "onnx_int8",
+      "flip_rate": 0.0819,
+      "flips_right_to_wrong": 22,
+      "flips_wrong_to_right": 17,
+      "flips_wrong_to_wrong": 39,
+      "macro_f1": 0.4838,
+      "mean_kl_divergence": 0.065672,
+      "p50_ms": 29.2,
+      "p95_ms": 31.02,
+      "size_mb": 110.6
+    }
+  ],
+  "latency_sample": 60,
+  "n_test": 952,
+  "note": "Latency is batch size one on a single CPU thread, after warm-up, three repeats. Flips are paired: every arm scored the identical test items in identical order.",
+  "threads": 1
+}
