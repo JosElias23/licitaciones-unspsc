@@ -1,5 +1,11 @@
 # Predicting purchasing categories from Chilean public tender titles
 
+[![CI](https://github.com/JosElias23/licitaciones-unspsc/actions/workflows/ci.yml/badge.svg)](https://github.com/JosElias23/licitaciones-unspsc/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-35%20passing-brightgreen)](https://github.com/JosElias23/licitaciones-unspsc/actions/workflows/ci.yml)
+[![python](https://img.shields.io/badge/python-3.10%20%7C%203.12-blue)](pyproject.toml)
+[![data](https://img.shields.io/badge/data-CC0%20ChileCompra-lightgrey)](https://api.mercadopublico.cl)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Chile publishes every public tender through an open OCDS API, and each one
 arrives with two things: the free-text title a civil servant typed, and the
 official UNSPSC category its line items were filed under. That pairing is a
