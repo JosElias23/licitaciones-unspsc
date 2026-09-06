@@ -15,8 +15,10 @@ This project asks whether eight words of abbreviated, capitalised Spanish are
 enough to recover the category, and whether a local LLM does it better than a
 linear model.
 
-**It does not.** The LLM loses by 32 accuracy points and takes 9,345 times
-longer.
+**Zero-shot, it does not**: the LLM loses by 32 accuracy points and takes 9,345
+times longer. Given eight *retrieved* examples it draws level, and stays roughly
+6,400 times slower. Eight *random* examples change nothing at all, which is the
+result the control arm exists to find.
 
 ---
 
@@ -40,10 +42,47 @@ Paired bootstrap over 5,000 resamples, on the rows both models saw:
 | **LLM vs TF-IDF** | **−0.3200** | **[−0.3900, −0.2500]** | **yes** |
 
 The supervised model learns the vocabulary of Chilean procurement from 2,874
-examples. The LLM has to reason about it from a prompt, and eight capitalised
-abbreviated words are not much to reason from. That is a result about this task,
-not about LLMs: few-shot prompting and fine-tuning are untried and are the
-obvious next experiments.
+examples. Zero-shot, the LLM has to reason about it from a prompt, and eight
+capitalised abbreviated words are not much to reason from.
+
+### Then it was given examples
+
+Same held-out month, same seeded 200-tender subset, k = 8:
+
+| Variant | Accuracy | 95% CI | Macro-F1 | ms per tender |
+|---|---:|:--|---:|---:|
+| TF-IDF + linear SVM | 0.5100 | [0.4400, 0.5800] | 0.4400 | 0.36 |
+| LLM zero-shot | 0.3000 | [0.2350, 0.3650] | 0.2823 | 2,249 |
+| LLM + 8 random examples | 0.2550 | [0.1950, 0.3200] | 0.2532 | 2,245 |
+| **LLM + 8 retrieved examples** | **0.4700** | **[0.4000, 0.5400]** | 0.3852 | 2,362 |
+| LLM + DSPy demonstrations | 0.4200 | [0.3549, 0.4900] | **0.3944** | **412** |
+
+| Comparison | Δ accuracy | 95% CI | Significant |
+|---|---:|:--|:--:|
+| Random examples vs zero-shot | −0.0450 | [−0.0950, +0.0050] | **no** |
+| **Retrieved vs random** | **+0.2150** | **[+0.1400, +0.2900]** | **yes** |
+| Retrieved vs TF-IDF | −0.0400 | [−0.1150, +0.0350] | **no** |
+| DSPy vs retrieved | −0.0500 | [−0.1300, +0.0300] | **no** |
+
+Three things fall out of that table.
+
+**Examples alone do nothing; relevant examples do everything.** Random
+demonstrations moved accuracy by −0.045 (p = 0.086). Retrieved ones gained 21.5
+points over the same count. Without the random arm, "few-shot helped" would have
+been indistinguishable from "the model finally saw the output format".
+
+**The gap closes to statistical parity.** Retrieval few-shot sits 4 points below
+the linear model with an interval covering zero. It matches, at roughly 6,400
+times the cost per tender.
+
+**DSPy matches retrieval at a sixth of the latency** (412 ms against 2,362 ms),
+because its demonstrations are fixed at compile time instead of rebuilt per
+query. Its first run scored 0.1050, and the cause was a bug in this repository
+rather than in DSPy: the signature was handed bare numeric codes while every
+other arm got the Spanish category names. That is written up in
+[`docs/DECISIONS.md`](docs/DECISIONS.md) section 5.3, because "the tool
+underperformed" and "I gave the tool a worse problem" look identical from the
+outside.
 
 ---
 
@@ -101,6 +140,7 @@ python -m pytest                                     # 35 tests
 python scripts/download_data.py                      # ~11 minutes
 python scripts/run_experiment.py --skip-llm          # seconds
 python scripts/run_experiment.py --llm-sample 300    # needs Ollama, ~11 minutes
+python scripts/run_llm_variants.py --sample 200      # few-shot arms, ~35 minutes
 ```
 
 The crawl is cached as JSON and loaded into one DuckDB file, so everything after
@@ -109,14 +149,16 @@ the first download runs offline. The corpus questions in `download_data.py`
 is what they are.
 
 Every number in this README comes from `reports/metrics_corpus.json` and
-`reports/metrics_experiment.json`, both produced by the scripts above.
+`reports/metrics_experiment.json` and `reports/metrics_llm_variants.json`,
+all produced by the scripts above.
 
 ---
 
 ## Limitations
 
-**No few-shot or optimised prompting.** The zero-shot gap is 32 points. Closing
-it with examples is plausible and untested.
+**No GEPA.** DSPy 3.3 ships `dspy.GEPA`, reported to reach a given quality in
+35x fewer rollouts. Only `BootstrapFewShot` was run, so nothing is claimed about
+stronger optimisers.
 
 **No fine-tuned encoder.** A Spanish BERT fine-tuned on 2,874 examples is the
 honest favourite for this task and is not implemented.

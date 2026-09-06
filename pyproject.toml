@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "ruff>=0.5"]
+llm = ["dspy>=3.0"]   # only needed for scripts/run_llm_variants.py
 
 [build-system]
 requires = ["setuptools>=68"]

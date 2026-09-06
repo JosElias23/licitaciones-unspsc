@@ -195,8 +195,7 @@ much to reason from.
 
 **What this does not show.** That LLMs are bad at classification in general, that
 a larger model would also lose, or that few-shot prompting or fine-tuning would
-not close the gap. Those are separate experiments, listed in
-[Not done](#5-what-was-not-done).
+not close the gap. Those are separate experiments, listed in section 6.
 
 ---
 
@@ -227,11 +226,108 @@ without saying this would overstate how much of the error is genuine confusion.
 
 ---
 
-## 5. What was not done
+## 5. Do examples close the gap?
 
-- **No few-shot prompting or DSPy optimisation of the LLM prompt.** The zero-shot
-  gap is 32 points; closing it with examples is plausible and is the obvious next
-  experiment, but it has not been run, so nothing is claimed about it.
+The zero-shot result invited an obvious objection: the LLM was asked to classify
+Chilean procurement jargon with no examples of it, while the linear model had
+2,874. An earlier version of this document listed that as untested.
+It is now tested.
+
+Four arms, all scored on the same seeded 200-tender subset of the held-out
+month, k = 8 examples where applicable.
+
+| Variant | Accuracy | 95% CI | Macro-F1 | ms per tender |
+|---|---:|:--|---:|---:|
+| TF-IDF + linear SVM | 0.5100 | [0.4400, 0.5800] | 0.4400 | 0.36 |
+| LLM zero-shot | 0.3000 | [0.2350, 0.3650] | 0.2823 | 2,249 |
+| LLM + 8 random examples | 0.2550 | [0.1950, 0.3200] | 0.2532 | 2,245 |
+| **LLM + 8 retrieved examples** | **0.4700** | **[0.4000, 0.5400]** | 0.3852 | 2,362 |
+| LLM + DSPy demonstrations | 0.4200 | [0.3549, 0.4900] | **0.3944** | **412** |
+
+Paired bootstrap, 5,000 resamples:
+
+| Comparison | Δ accuracy | 95% CI | p | Significant |
+|---|---:|:--|---:|:--:|
+| Random examples vs zero-shot | −0.0450 | [−0.0950, +0.0050] | 0.086 | **no** |
+| **Retrieved vs random examples** | **+0.2150** | **[+0.1400, +0.2900]** | <0.001 | **yes** |
+| Retrieved examples vs TF-IDF | −0.0400 | [−0.1150, +0.0350] | 0.314 | **no** |
+| DSPy vs retrieved examples | −0.0500 | [−0.1300, +0.0300] | 0.237 | **no** |
+
+### 5.1 Examples do not help. *Relevant* examples do.
+
+This is why the random arm exists, and it is the finding that would have been
+missed without it.
+
+Eight random training examples changed nothing (−0.045, p = 0.086); if anything
+they hurt slightly. Eight examples retrieved by similarity gained **21.5
+accuracy points** over the same number of random ones, and that interval is
+nowhere near zero.
+
+A great many "few-shot improved our results" claims do not run this control, and
+without it the two explanations, "the model learned the task from examples" and
+"the model finally saw the output format", are indistinguishable. Here the
+format explanation is ruled out: both arms showed the format, and only the
+relevant one helped.
+
+### 5.2 The gap closes, and the earlier headline needs qualifying
+
+Retrieval few-shot sits 4 accuracy points below the linear model with an
+interval of [−0.115, +0.035], which covers zero. **On this test set the two are
+statistically indistinguishable.**
+
+That does not overturn section 3, it qualifies it. The honest summary of the
+whole project is now: a zero-shot LLM loses badly to a linear model on this
+task, and a retrieval-augmented one matches it while remaining roughly 6,400
+times slower per tender. Matching accuracy at four orders of magnitude more
+compute is not a reason to deploy it.
+
+### 5.3 A bug in my harness, not in the tool
+
+The first DSPy run scored **0.1050**, below even the zero-shot prompt, and the
+natural way to write that up would have been "the optimiser underperforms".
+
+It was my mistake. The DSPy signature received `segmentos_posibles` as
+`", ".join(allowed)` — that is, `"10, 15, 20, 25, ..."`, bare numbers with no
+key — while every hand-written prompt received `"15: Combustibles y
+lubricantes"` and so on. The optimiser was being asked to map Spanish tender
+titles onto naked integers.
+
+Supplying the same Spanish glosses the other arms already had:
+
+| | Before | After |
+|---|---:|---:|
+| Accuracy | 0.1050 | **0.4200** |
+| Macro-F1 | 0.0349 | **0.3944** |
+| Unusable answers | 26 / 200 | **0 / 200** |
+
+Four times better, from fixing the harness rather than the method. The
+comparison had been measuring my plumbing.
+
+The general lesson is the one worth keeping: when a tool underperforms a
+baseline by a wide margin, the first hypothesis should be that it was handed a
+worse problem, not that it is worse. Checking cost 15 minutes; publishing the
+original number would have been a false claim about a real library.
+
+### 5.4 DSPy matches retrieval at a sixth of the latency
+
+DSPy's demonstrations are chosen once at compile time (20 s, 8 kept) and then
+fixed, so its prompt is short and constant. Retrieval rebuilds a 910-token
+prompt for every tender.
+
+The accuracies are indistinguishable (−0.05, p = 0.237) and DSPy has the better
+macro-F1 (0.3944 against 0.3852), but it answers in **412 ms against 2,362 ms**,
+**5.7 times faster**. For a batch job that difference is irrelevant; for an
+interactive endpoint it is the whole decision.
+
+Neither is close to the 0.36 ms of the linear model.
+
+---
+
+## 6. What was not done
+
+- **No GEPA.** DSPy 3.3 ships `dspy.GEPA`, reported to reach a given quality in
+  35x fewer rollouts than earlier optimisers. Only `BootstrapFewShot` was run
+  here, so nothing is claimed about what a stronger optimiser would do.
 - **No fine-tuned encoder.** A Spanish BERT fine-tuned on 2,874 examples would
   very likely beat both, and is the honest favourite for this task.
 - **No hierarchical evaluation.** UNSPSC nests segment → family → class →
@@ -247,7 +343,7 @@ without saying this would overstate how much of the error is genuine confusion.
 
 ---
 
-## 6. Reproducing
+## 7. Reproducing
 
 ```bash
 pip install -e ".[dev]"
