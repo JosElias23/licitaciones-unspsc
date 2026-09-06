@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      # No network needed: the corpus tests skip themselves when the cache is
+      # absent, and everything else runs on synthetic tenders.
+      - name: Test
+        run: pytest -q
+
+  # The label in this dataset is derivable from a field that looks like a
+  # feature. CI re-checks that the guard still fires, because a change that
+  # disabled it would not fail any other test -- it would just make the scores
+  # go up.
+  verify-leakage-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: The leakage guard must reject label-derived features
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "src")
+          from licitaciones.data import FORBIDDEN_FEATURES, LeakageError, assert_no_leakage
+          from licitaciones.models import tender_text
+          from licitaciones.data import Tender
+
+          for name in sorted(FORBIDDEN_FEATURES):
+              try:
+                  assert_no_leakage(["title", name])
+              except LeakageError:
+                  continue
+              raise SystemExit(f"Guard failed to reject {name!r}")
+
+          assert assert_no_leakage(["title", "description"]) is None
+
+          t = Tender(ocid="x", tender_id="1", title="ADQ. ASEO",
+                     description="compra", buyer="MUNI", method="LE",
+                     published="2026-03-01T00:00:00Z", unspsc_codes=["47131803"])
+          text = tender_text(t)
+          assert "/" not in text, "model input contains a taxonomy path"
+          assert "MUNI" not in text, "model input contains the buyer"
+          print(f"Guard rejects all {len(FORBIDDEN_FEATURES)} label-derived features.")
+          PY
