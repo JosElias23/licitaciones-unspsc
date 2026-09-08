@@ -6,6 +6,8 @@
 [![data](https://img.shields.io/badge/data-CC0%20ChileCompra-lightgrey)](https://api.mercadopublico.cl)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+**English** · [Español](README.es.md)
+
 Chile publishes every public tender through an open OCDS API, and each one
 arrives with two things: the free-text title a civil servant typed, and the
 official UNSPSC category its line items were filed under. That pairing is a
