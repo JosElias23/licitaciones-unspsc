@@ -237,7 +237,7 @@ all produced by the scripts above.
 ## Limitations
 
 **No GEPA.** DSPy 3.3 ships `dspy.GEPA`, reported to reach a given quality in
-35x fewer rollouts. Only `BootstrapFewShot` was run, so nothing is claimed about
+35× fewer rollouts. Only `BootstrapFewShot` was run, so nothing is claimed about
 stronger optimisers.
 
 **No calibration.** The encoder's softmax scores rank well but are not
