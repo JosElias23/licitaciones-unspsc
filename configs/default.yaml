@@ -49,7 +49,12 @@ baselines:
 encoder:
   model_name: dccuchile/bert-base-spanish-wwm-cased    # BETO
   max_length: 64
-  num_epochs: 15          # 6 is undertrained (loss 1.87), 30 overfits; see docs/DECISIONS.md
+  # Chosen on a validation month (March), never on the held-out test month.
+  # The earlier value of 15 came from scoring 6/15/30 on April and keeping the
+  # best, which is selection on the test set; scripts/select_epochs.py redoes
+  # the choice honestly and validation accuracy rises monotonically to 30.
+  # See docs/DECISIONS.md section 6.1.
+  num_epochs: 30
   batch_size: 32
   learning_rate: 3.0e-5
   weight_decay: 0.01
@@ -59,7 +64,12 @@ llm:
   # Local model, so the repository costs nothing to reproduce and no key leaves
   # the machine.
   provider: ollama
-  base_url: http://localhost:11434
+  # An IP literal, not "localhost", and that is not a style preference. On this
+  # machine localhost resolves to ::1 first while Ollama binds IPv4 only, so
+  # every urllib call waited ~2,054 ms for the IPv6 connection to be refused
+  # before falling back. That artefact sat inside every published per-tender
+  # latency until scripts/measure_llm_overhead.py isolated it.
+  base_url: http://127.0.0.1:11434
   model: qwen2.5:7b-instruct
   temperature: 0.0
   max_tokens: 64

@@ -26,7 +26,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from run_experiment import load_tenders  # noqa: E402
 
-from licitaciones.encoder import EncoderClassifier, coverage_accuracy_curve  # noqa: E402
+from licitaciones.encoder import (  # noqa: E402
+    EncoderClassifier,
+    confidence_discrimination,
+    coverage_accuracy_curve,
+)
 from licitaciones.evaluate import (  # noqa: E402
     bootstrap_metric,
     confusion_pairs,
@@ -128,6 +132,11 @@ def main() -> int:
     }
 
     curve = coverage_accuracy_curve(y_test, preds, confidence)
+    # The curve shows the operating points; this says whether the confidence
+    # ranking them is real. A monotone curve is nearly automatic and was
+    # previously offered as if it were evidence.
+    discrimination = confidence_discrimination(y_test, preds, confidence,
+                                               seed=config["seed"])
     errors = confusion_pairs(y_test, preds)
 
     save_json(
@@ -137,7 +146,11 @@ def main() -> int:
             "confidence_intervals": intervals,
             "encoder_vs_tfidf": comparison,
             "coverage_accuracy_curve": curve,
+            "confidence_discrimination": discrimination,
             "top_confusions": errors,
+            "predictions": preds,
+            "confidence": [round(float(c), 6) for c in confidence],
+            "y_true": y_test,
         },
         "reports/metrics_encoder.json",
     )
@@ -155,6 +168,11 @@ def main() -> int:
               f"[{c['ci_lower']:+.4f}, {c['ci_upper']:+.4f}], p={c['p_value']:.4f}, "
               f"{'significant' if c['significant'] else 'NOT significant'}")
     print()
+    if discrimination.get("auroc") is not None:
+        print(f"confidence vs correctness: AUROC {discrimination['auroc']:.4f}, "
+              f"permutation p = {discrimination['permutation_p']:.4f} "
+              f"({discrimination['n_permutations']} shuffles)")
+        print()
     print("| Confidence >= | Coverage | Tenders kept | Accuracy on kept |")
     print("|---:|---:|---:|---:|")
     for row in curve:

@@ -47,7 +47,7 @@ class OllamaChat:
     """Minimal Ollama client that records latency and token counts per call."""
 
     def __init__(self, cfg: dict):
-        self.base_url = cfg.get("base_url", "http://localhost:11434")
+        self.base_url = cfg.get("base_url", "http://127.0.0.1:11434")
         self.model = cfg.get("model", "qwen2.5:7b-instruct")
         self.temperature = cfg.get("temperature", 0.0)
         self.max_tokens = cfg.get("max_tokens", 64)
@@ -174,6 +174,46 @@ class FewShotClassifier(_PromptedClassifier):
         return [(self.train_texts[i][:110], self.train_labels[i]) for i in top]
 
 
+class KnnMajorityControl(FewShotClassifier):
+    """The retrieval arm with the model taken out: majority vote over the same k.
+
+    This is the control the few-shot result needed and did not have. When
+    retrieval few-shot beat random few-shot by 21.5 points, the write-up read
+    that as the model reasoning over relevant evidence. There is a duller
+    explanation that fits the same number: the eight retrieved titles are near
+    neighbours of the query, so their labels already concentrate on the right
+    answer, and a model that simply copies the most common label it was shown
+    would score the same.
+
+    Those two stories are distinguishable, and the instrument is this class. It
+    inherits the retriever, so it sees byte-identical examples in identical
+    order, and then never calls the LLM at all -- it returns the most common
+    label among them. Whatever it scores is the share of the retrieval arm's
+    accuracy that is the *retriever's*, not the language model's.
+
+    Ties break toward the nearer neighbour: `_select` returns examples in
+    descending similarity and `Counter.most_common` is stable on insertion
+    order, so the first-seen label wins a tie.
+    """
+
+    name = "knn_majority_control"
+
+    def predict(self, tenders: list[Tender]) -> list[str]:
+        out = []
+        started = time.perf_counter()
+        for tender in tenders:
+            labels = [label for _, label in self._select(tender)]
+            out.append(Counter(labels).most_common(1)[0][0] if labels else self.fallback)
+        self.predict_seconds = time.perf_counter() - started
+        self.n_predicted = len(tenders)
+        return out
+
+    @property
+    def cost_note(self) -> str:
+        per = 1000 * getattr(self, "predict_seconds", 0.0) / max(getattr(self, "n_predicted", 0), 1)
+        return f"no LLM call; retrieval only, {per:.2f} ms per tender"
+
+
 class RandomFewShotClassifier(_PromptedClassifier):
     """k training examples chosen at random, fixed across all test tenders.
 
@@ -241,9 +281,15 @@ class DspyClassifier(BaseClassifier):
 
         lm = dspy.LM(
             f"ollama_chat/{self.cfg['model']}",
-            api_base=self.cfg.get("base_url", "http://localhost:11434"),
+            api_base=self.cfg.get("base_url", "http://127.0.0.1:11434"),
             api_key="", temperature=self.cfg.get("temperature", 0.0),
             max_tokens=self.cfg.get("max_tokens", 64),
+            # `dspy.LM` caches by default. Every other arm here uses a bespoke
+            # client with no cache at all, so leaving it on times a dictionary
+            # lookup against five arms timing a 7B model. It is the difference
+            # between 1 ms and a real answer, and the earlier write-up reported
+            # DSPy as "a sixth of the latency" on a number measured this way.
+            cache=False,
         )
         dspy.configure(lm=lm)
 

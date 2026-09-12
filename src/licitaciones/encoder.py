@@ -32,6 +32,7 @@ from collections import Counter
 
 import numpy as np
 import torch
+from sklearn.metrics import roc_auc_score
 from torch.utils.data import Dataset
 
 from licitaciones.data import Tender, assert_no_leakage
@@ -181,6 +182,65 @@ class EncoderClassifier(BaseClassifier):
     def cost_note(self) -> str:
         return (f"fine-tuned in {self.train_seconds:.0f}s on {self.device}, "
                 f"{getattr(self, 'n_parameters', 0) / 1e6:.0f}M parameters")
+
+
+def confidence_discrimination(
+    y_true: list[str],
+    y_pred: list[str],
+    confidence: np.ndarray,
+    n_permutations: int = 2000,
+    seed: int = 42,
+) -> dict:
+    """Does softmax confidence actually rank correct predictions above wrong ones?
+
+    The write-up argued it did, from the coverage curve rising monotonically as
+    the threshold went up. That is a much weaker argument than it looks. The
+    kept sets are nested -- every threshold's rows are a subset of the previous
+    one's -- so successive accuracies are strongly dependent, and any
+    association at all, however slight, tends to produce a monotone-looking
+    column. Eight rising numbers are close to what you get for free.
+
+    The quantity that answers the question is the probability that a randomly
+    chosen correct prediction carries more confidence than a randomly chosen
+    wrong one: the AUROC of confidence against correctness. It is
+    threshold-free, it has an interpretable null (0.5), and it is not inflated
+    by nesting.
+
+    A permutation test comes with it because the AUROC alone is a point
+    estimate. Confidences are shuffled against the correctness labels
+    `n_permutations` times; the p-value is the share of shuffles reaching the
+    observed value. That is a test of the claim, rather than a restatement of
+    it.
+    """
+    correct = np.asarray([t == p for t, p in zip(y_true, y_pred, strict=True)],
+                         dtype=bool)
+    conf = np.asarray(confidence, dtype=float)
+
+    if correct.all() or not correct.any():
+        return {"auroc": None, "note": "every prediction fell on one side; "
+                                       "discrimination is undefined"}
+
+    observed = float(roc_auc_score(correct, conf))
+    rng = np.random.default_rng(seed)
+    at_least = 0
+    for _ in range(n_permutations):
+        if roc_auc_score(correct, rng.permutation(conf)) >= observed:
+            at_least += 1
+    p_value = (at_least + 1) / (n_permutations + 1)   # never reports exactly 0
+
+    return {
+        "auroc": round(observed, 4),
+        "permutation_p": round(p_value, 4),
+        "n_permutations": n_permutations,
+        "mean_confidence_when_right": round(float(conf[correct].mean()), 4),
+        "mean_confidence_when_wrong": round(float(conf[~correct].mean()), 4),
+        "n_correct": int(correct.sum()),
+        "n_wrong": int((~correct).sum()),
+        "note": ("AUROC of confidence against correctness. 0.5 is no ranking "
+                 "ability. This replaces the earlier argument from a monotone "
+                 "coverage curve, which is nearly automatic because the kept "
+                 "sets are nested."),
+    }
 
 
 def coverage_accuracy_curve(

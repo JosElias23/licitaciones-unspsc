@@ -1,0 +1,307 @@
+{
+  "chosen_epochs": 30,
+  "chosen_mean_val_accuracy": 0.5333,
+  "noise_check": {
+    "grid_separates_from_seed_noise": true,
+    "mean_sd_within_grid_point_across_seeds": 0.0075,
+    "note": "If the seed-to-seed spread at a fixed epoch count is as large as the spread across epoch counts, the grid is measuring noise and the choice of epoch count is arbitrary.",
+    "sd_between_grid_points": 0.0375
+  },
+  "protocol": {
+    "grid": [
+      3,
+      6,
+      10,
+      15,
+      20,
+      30
+    ],
+    "inner_cutoff": "2026-03-01",
+    "n_classes_full": 32,
+    "n_classes_inner": 24,
+    "n_inner_train": 1922,
+    "n_test": 952,
+    "n_train_full": 2874,
+    "n_validation": 952,
+    "outer_cutoff": "2026-04-01",
+    "seeds": [
+      42,
+      43,
+      44
+    ]
+  },
+  "selection_on_validation": [
+    {
+      "epochs": 3,
+      "mean_val_accuracy": 0.4366,
+      "mean_val_macro_f1": 0.2251,
+      "runs": [
+        {
+          "accuracy": 0.437,
+          "macro_f1": 0.2224,
+          "seed": 42,
+          "train_predict_seconds": 17.4
+        },
+        {
+          "accuracy": 0.4307,
+          "macro_f1": 0.2286,
+          "seed": 43,
+          "train_predict_seconds": 13.1
+        },
+        {
+          "accuracy": 0.4422,
+          "macro_f1": 0.2242,
+          "seed": 44,
+          "train_predict_seconds": 12.8
+        }
+      ],
+      "sd_val_accuracy": 0.0058
+    },
+    {
+      "epochs": 6,
+      "mean_val_accuracy": 0.4989,
+      "mean_val_macro_f1": 0.3453,
+      "runs": [
+        {
+          "accuracy": 0.5084,
+          "macro_f1": 0.3602,
+          "seed": 42,
+          "train_predict_seconds": 24.1
+        },
+        {
+          "accuracy": 0.4989,
+          "macro_f1": 0.3413,
+          "seed": 43,
+          "train_predict_seconds": 28.1
+        },
+        {
+          "accuracy": 0.4895,
+          "macro_f1": 0.3344,
+          "seed": 44,
+          "train_predict_seconds": 30.0
+        }
+      ],
+      "sd_val_accuracy": 0.0095
+    },
+    {
+      "epochs": 10,
+      "mean_val_accuracy": 0.5252,
+      "mean_val_macro_f1": 0.4446,
+      "runs": [
+        {
+          "accuracy": 0.5368,
+          "macro_f1": 0.4575,
+          "seed": 42,
+          "train_predict_seconds": 73.8
+        },
+        {
+          "accuracy": 0.5074,
+          "macro_f1": 0.4222,
+          "seed": 43,
+          "train_predict_seconds": 59.4
+        },
+        {
+          "accuracy": 0.5315,
+          "macro_f1": 0.4542,
+          "seed": 44,
+          "train_predict_seconds": 41.2
+        }
+      ],
+      "sd_val_accuracy": 0.0157
+    },
+    {
+      "epochs": 15,
+      "mean_val_accuracy": 0.5273,
+      "mean_val_macro_f1": 0.4652,
+      "runs": [
+        {
+          "accuracy": 0.5305,
+          "macro_f1": 0.4761,
+          "seed": 42,
+          "train_predict_seconds": 77.5
+        },
+        {
+          "accuracy": 0.5189,
+          "macro_f1": 0.462,
+          "seed": 43,
+          "train_predict_seconds": 68.7
+        },
+        {
+          "accuracy": 0.5326,
+          "macro_f1": 0.4574,
+          "seed": 44,
+          "train_predict_seconds": 79.2
+        }
+      ],
+      "sd_val_accuracy": 0.0074
+    },
+    {
+      "epochs": 20,
+      "mean_val_accuracy": 0.5315,
+      "mean_val_macro_f1": 0.469,
+      "runs": [
+        {
+          "accuracy": 0.5315,
+          "macro_f1": 0.4684,
+          "seed": 42,
+          "train_predict_seconds": 129.6
+        },
+        {
+          "accuracy": 0.5347,
+          "macro_f1": 0.4821,
+          "seed": 43,
+          "train_predict_seconds": 98.1
+        },
+        {
+          "accuracy": 0.5284,
+          "macro_f1": 0.4565,
+          "seed": 44,
+          "train_predict_seconds": 95.8
+        }
+      ],
+      "sd_val_accuracy": 0.0032
+    },
+    {
+      "epochs": 30,
+      "mean_val_accuracy": 0.5333,
+      "mean_val_macro_f1": 0.4656,
+      "runs": [
+        {
+          "accuracy": 0.5357,
+          "macro_f1": 0.4597,
+          "seed": 42,
+          "train_predict_seconds": 147.8
+        },
+        {
+          "accuracy": 0.5347,
+          "macro_f1": 0.4847,
+          "seed": 43,
+          "train_predict_seconds": 127.5
+        },
+        {
+          "accuracy": 0.5294,
+          "macro_f1": 0.4523,
+          "seed": 44,
+          "train_predict_seconds": 130.6
+        }
+      ],
+      "sd_val_accuracy": 0.0034
+    }
+  ],
+  "test_at_chosen_epochs": {
+    "beto_finetuned": {
+      "accuracy": 0.5221,
+      "macro_f1": 0.4646,
+      "seconds": 159.1
+    },
+    "confidence_intervals": {
+      "beto_finetuned": {
+        "accuracy": {
+          "ci_lower": 0.4916,
+          "ci_upper": 0.5546,
+          "metric": "accuracy",
+          "n_resamples": 5000,
+          "point": 0.5221
+        },
+        "macro_f1": {
+          "ci_lower": 0.4206,
+          "ci_upper": 0.4956,
+          "metric": "macro_f1",
+          "n_resamples": 5000,
+          "point": 0.4646
+        }
+      },
+      "tfidf_svm": {
+        "accuracy": {
+          "ci_lower": 0.5263,
+          "ci_upper": 0.5893,
+          "metric": "accuracy",
+          "n_resamples": 5000,
+          "point": 0.5578
+        },
+        "macro_f1": {
+          "ci_lower": 0.4632,
+          "ci_upper": 0.5395,
+          "metric": "macro_f1",
+          "n_resamples": 5000,
+          "point": 0.5077
+        }
+      }
+    },
+    "encoder_vs_tfidf": {
+      "accuracy": {
+        "ci_lower": -0.0651,
+        "ci_upper": -0.0063,
+        "difference": -0.0357,
+        "metric": "accuracy",
+        "n_resamples": 5000,
+        "p_value": 0.0196,
+        "significant": true
+      },
+      "macro_f1": {
+        "ci_lower": -0.0775,
+        "ci_upper": -0.0074,
+        "difference": -0.0431,
+        "metric": "macro_f1",
+        "n_resamples": 5000,
+        "p_value": 0.0168,
+        "significant": true
+      }
+    },
+    "tfidf_svm": {
+      "accuracy": 0.5578,
+      "macro_f1": 0.5077
+    }
+  },
+  "test_sensitivity_disclosed_not_used_for_selection": [
+    {
+      "epochs": 3,
+      "p_value": 0.0,
+      "significant": true,
+      "test_accuracy": 0.4443,
+      "test_macro_f1": 0.1935,
+      "vs_tfidf": -0.1134
+    },
+    {
+      "epochs": 6,
+      "p_value": 0.0,
+      "significant": true,
+      "test_accuracy": 0.4989,
+      "test_macro_f1": 0.3544,
+      "vs_tfidf": -0.0588
+    },
+    {
+      "epochs": 10,
+      "p_value": 0.026,
+      "significant": true,
+      "test_accuracy": 0.5221,
+      "test_macro_f1": 0.4486,
+      "vs_tfidf": -0.0357
+    },
+    {
+      "epochs": 15,
+      "p_value": 0.186,
+      "significant": false,
+      "test_accuracy": 0.5378,
+      "test_macro_f1": 0.4886,
+      "vs_tfidf": -0.02
+    },
+    {
+      "epochs": 20,
+      "p_value": 0.108,
+      "significant": false,
+      "test_accuracy": 0.5336,
+      "test_macro_f1": 0.4773,
+      "vs_tfidf": -0.0242
+    },
+    {
+      "epochs": 30,
+      "p_value": 0.0196,
+      "significant": true,
+      "test_accuracy": 0.5221,
+      "test_macro_f1": 0.4646,
+      "vs_tfidf": -0.0357
+    }
+  ],
+  "why": "The published epoch count was chosen on the test month. This re-runs the choice on a validation month carved out of the training window, and reports what the test set says afterwards."
+}

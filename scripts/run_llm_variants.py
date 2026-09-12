@@ -7,11 +7,15 @@ them three ways and measures each on the identical test subset:
   llm_zero_shot        no examples (the published baseline, re-run here)
   llm_fewshot_random   8 random training examples, fixed for every tender
   llm_fewshot_knn      the 8 most similar training titles, retrieved per tender
+  knn_majority_control the same 8 neighbours, majority vote, no LLM at all
   llm_dspy_bootstrap   demonstrations chosen by DSPy from the model's own hits
 
-The random arm is not filler. Without it, any improvement from retrieval could
-equally be explained by the model finally seeing the output format, and those
-are different findings.
+Neither control is filler. Without the random arm, any improvement from
+retrieval could equally be explained by the model finally seeing the output
+format. Without the majority-vote arm, it could equally be explained by the
+retriever already having found the answer, leaving the model nothing to do but
+copy the most common label in front of it. Those are three different findings
+and they are told apart by arms, not by argument.
 
 Usage:
     python scripts/run_llm_variants.py --sample 200
@@ -29,10 +33,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import numpy as np  # noqa: E402
 
-from licitaciones.evaluate import bootstrap_metric, paired_bootstrap, score  # noqa: E402
+from licitaciones.evaluate import (  # noqa: E402
+    bootstrap_metric,
+    minimum_detectable_effect,
+    paired_bootstrap,
+    score,
+)
 from licitaciones.llm_variants import (  # noqa: E402
     DspyClassifier,
     FewShotClassifier,
+    KnnMajorityControl,
     RandomFewShotClassifier,
 )
 from licitaciones.models import (  # noqa: E402
@@ -101,6 +111,9 @@ def main() -> int:
         LlmClassifier(llm_cfg),
         RandomFewShotClassifier(llm_cfg, k=args.k, seed=config["seed"]),
         FewShotClassifier(llm_cfg, k=args.k),
+        # The retriever on its own. Whatever this scores is the part of the
+        # few-shot result that never needed a language model.
+        KnnMajorityControl(llm_cfg, k=args.k),
     ]
     if not args.skip_dspy:
         models.append(DspyClassifier(llm_cfg, max_demos=args.k, seed=config["seed"]))
@@ -140,6 +153,7 @@ def main() -> int:
     pairs = [
         ("llm_fewshot_random", "llm_zero_shot"),      # do examples help at all?
         ("llm_fewshot_knn", "llm_fewshot_random"),    # does relevance help?
+        ("llm_fewshot_knn", "knn_majority_control"),  # does the *model* help?
         ("llm_fewshot_knn", "tfidf_svm"),             # is the gap closed?
     ]
     if not args.skip_dspy:
@@ -148,9 +162,36 @@ def main() -> int:
     comparisons = {}
     for a, b in pairs:
         if a in predictions and b in predictions:
-            comparisons[f"{a}_vs_{b}"] = paired_bootstrap(
-                y_test, predictions[a], predictions[b], "accuracy",
-                n_boot, config["seed"])
+            c = paired_bootstrap(y_test, predictions[a], predictions[b],
+                                 "accuracy", n_boot, config["seed"])
+            # Every null here is reported with the effect it could have found.
+            # On a 200-tender subset that floor is around eleven accuracy
+            # points, which is larger than several of the differences below.
+            c["power"] = minimum_detectable_effect(c)
+            comparisons[f"{a}_vs_{b}"] = c
+
+    # How often does the language model simply return the most common label it
+    # was shown? Equal accuracy between the two arms would be suggestive; a high
+    # agreement rate is the thing that settles it, and it cannot be recovered
+    # later from accuracies alone -- which is why the predictions are stored.
+    agreement = None
+    if "llm_fewshot_knn" in predictions and "knn_majority_control" in predictions:
+        a, b = predictions["llm_fewshot_knn"], predictions["knn_majority_control"]
+        same = sum(1 for x, y in zip(a, b, strict=True) if x == y)
+        both_right = sum(1 for x, y, truth in zip(a, b, y_test, strict=True)
+                         if x == y == truth)
+        agreement = {
+            "identical_predictions": same,
+            "n": len(a),
+            "agreement_rate": round(same / len(a), 4),
+            "agree_and_correct": both_right,
+            "llm_right_where_control_wrong": sum(
+                1 for x, y, truth in zip(a, b, y_test, strict=True)
+                if x == truth and y != truth),
+            "control_right_where_llm_wrong": sum(
+                1 for x, y, truth in zip(a, b, y_test, strict=True)
+                if y == truth and x != truth),
+        }
 
     save_json(
         {
@@ -159,6 +200,12 @@ def main() -> int:
             "results": results,
             "confidence_intervals": intervals,
             "comparisons": comparisons,
+            "llm_vs_retriever_agreement": agreement,
+            # Stored so any later question about these arms -- agreement,
+            # per-row error analysis, a comparison nobody thought of yet -- can
+            # be answered without paying for the LLM calls again.
+            "predictions": predictions,
+            "y_true": y_test,
         },
         "reports/metrics_llm_variants.json",
     )
@@ -172,12 +219,16 @@ def main() -> int:
               f"[{ci['ci_lower']:.4f}, {ci['ci_upper']:.4f}] | "
               f"{r['macro_f1']:.4f} | {r['ms_per_tender']:.0f} |")
     print()
-    print("| Comparison | delta | 95% CI | p | Significant |")
-    print("|---|---:|:--|---:|:--:|")
+    print("| Comparison | delta | 95% CI | p | Significant | MDE @80% |")
+    print("|---|---:|:--|---:|:--:|---:|")
     for key, c in comparisons.items():
         print(f"| {key.replace('_vs_', ' vs ')} | {c['difference']:+.4f} | "
               f"[{c['ci_lower']:+.4f}, {c['ci_upper']:+.4f}] | {c['p_value']:.4f} | "
-              f"{'yes' if c['significant'] else 'NO'} |")
+              f"{'yes' if c['significant'] else 'NO'} | "
+              f"{c['power']['minimum_detectable_effect']:.4f} |")
+    print()
+    print("A null with |delta| below the MDE is a test that could not have "
+          "found anything, and must not be written up as equivalence.")
     return 0
 
 

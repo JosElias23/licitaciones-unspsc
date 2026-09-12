@@ -255,7 +255,7 @@ class TfidfLinearClassifier(BaseClassifier):
 class LlmClassifier(BaseClassifier):
     """A local instruction-tuned model, prompted with the candidate label set.
 
-    Runs against Ollama on localhost, so the repository needs no API key and
+    Runs against Ollama on the loopback, so the repository needs no API key and
     costs nothing to reproduce. Latency and token counts are recorded on every
     call, because the interesting comparison against a linear model is not
     accuracy alone but accuracy per unit of compute.
@@ -268,7 +268,7 @@ class LlmClassifier(BaseClassifier):
     name = "llm_zero_shot"
 
     def __init__(self, cfg: dict):
-        self.base_url = cfg.get("base_url", "http://localhost:11434")
+        self.base_url = cfg.get("base_url", "http://127.0.0.1:11434")
         self.model = cfg.get("model", "qwen2.5:7b-instruct")
         self.temperature = cfg.get("temperature", 0.0)
         self.max_tokens = cfg.get("max_tokens", 64)

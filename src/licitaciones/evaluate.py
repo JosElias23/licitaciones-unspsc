@@ -22,6 +22,8 @@ alongside the seconds it took to produce.
 
 from __future__ import annotations
 
+from statistics import NormalDist
+
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
@@ -136,6 +138,63 @@ def paired_bootstrap(
         "p_value": round(min(1.0, float(tail) * 2), 4),
         "significant": bool(lower > 0 or upper < 0),
         "n_resamples": n_resamples,
+    }
+
+
+def minimum_detectable_effect(
+    comparison: dict, power: float = 0.80, alpha: float = 0.05
+) -> dict:
+    """How large a gap this comparison could have detected, given its size.
+
+    An interval that covers zero means the test did not separate the two
+    models. It does not mean the two models are equal, and the distance between
+    those two statements is the whole content of this function.
+
+    A comparison on 200 tenders has a standard error around four accuracy
+    points, which makes anything under roughly eleven points invisible to it.
+    Writing such a null up as "parity" or "it matches" claims a result the
+    design could not have produced, in the one direction that flatters the
+    conclusion.
+
+    The standard error is recovered from the bootstrap interval's half-width
+    rather than recomputed, so this describes the test that was actually run:
+
+        se   = (upper - lower) / (2 * z_{1-alpha/2})
+        mde  = (z_{1-alpha/2} + z_{power}) * se
+
+    Two numbers come back and they answer different questions. The **MDE** is
+    prospective: what this design could have caught. `largest_effect_not_
+    excluded` is retrospective and is the one an equivalence claim has to clear
+    -- the biggest true gap still consistent with the data, read straight off
+    the far end of the interval. Equivalence within some margin is defensible
+    only when that margin exceeds it.
+
+    There is deliberately no boolean here saying a null is informative. Any
+    non-significant difference has |delta| < z_{1-alpha/2} * se, which is
+    always below the MDE, so such a flag could never be true and would only
+    look like a check that had been performed.
+    """
+    half_width = (comparison["ci_upper"] - comparison["ci_lower"]) / 2
+    # NormalDist rather than scipy: scipy is only present here as a
+    # scikit-learn transitive dependency and is not declared in
+    # pyproject.toml, so importing it directly would be a dependency this
+    # project never took.
+    z_alpha = NormalDist().inv_cdf(1 - alpha / 2)
+    z_power = NormalDist().inv_cdf(power)
+    se = half_width / z_alpha
+    mde = (z_alpha + z_power) * se
+    bound = max(abs(comparison["ci_lower"]), abs(comparison["ci_upper"]))
+
+    return {
+        "standard_error": round(float(se), 4),
+        "minimum_detectable_effect": round(float(mde), 4),
+        "largest_effect_not_excluded": round(float(bound), 4),
+        "power": power,
+        "alpha": alpha,
+        "observed_difference": comparison["difference"],
+        "note": ("A null smaller than the MDE is a test that could not have "
+                 "found anything. Equivalence is only defensible against a "
+                 "margin wider than largest_effect_not_excluded."),
     }
 
 
